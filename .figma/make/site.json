@@ -1,0 +1,10 @@
+{
+  "description": "SafeJourney is a personal safety app for solo female travelers, monitoring their journeys and alerting trusted contacts only when unusual activity occurs.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
