@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, lazy, Suspense } from 'react'
+import { supabase } from './supabase'
 import type { RouteInfo } from './MapPlanner'
 import { StaticFallbackMap, ACTIVITY_EMOJIS, OnboardingMapVisual } from './MapPlanner'
 
@@ -2007,7 +2008,32 @@ export default function App() {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {screen === 'account-setup' && (
                   <AccountSetup
-                    onConfirm={(name, email, phone) => { setUserName(name || 'Petra'); setUserEmail(email); setUserPhone(phone); setHasAccount(true); go('subscription-plan') }}
+                  onConfirm={async (name, email, phone, password) => {
+                    const { data, error } = await supabase.auth.signUp({
+                      email,
+                      password,
+                      options: {
+                        data: {
+                          full_name: name,
+                          phone,
+                        },
+                      },
+                    })
+                  
+                    if (error) {
+                      console.error('Supabase signup error:', error)
+                      return
+                    }
+                  
+                    setUserName(name || 'Petra')
+                    setUserEmail(email)
+                    setUserPhone(phone)
+                    setHasAccount(true)
+                  
+                    if (data.user) {
+                      go('subscription-plan')
+                    }
+                  }}
                     onDataPrivacy={() => { setDataPrivacyFrom('account-setup'); go('data-privacy') }}
                     initialValues={accountDraft}
                     onValuesChange={setAccountDraft}
