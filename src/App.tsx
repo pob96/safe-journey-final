@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 import { supabase } from './supabase'
 import type { RouteInfo } from './MapPlanner'
 import { StaticFallbackMap, ACTIVITY_EMOJIS, OnboardingMapVisual } from './MapPlanner'
@@ -7,7 +7,7 @@ import { StaticFallbackMap, ACTIVITY_EMOJIS, OnboardingMapVisual } from './MapPl
 const MapPlanner = lazy(() => import('./MapPlanner').then(m => ({ default: m.MapPlanner })))
 const ActiveJourneyMap = lazy(() => import('./MapPlanner').then(m => ({ default: m.ActiveJourneyMap })))
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Types ────────────────────────────────────────────────────────────────────
 type Screen =
   | 'onboarding' | 'home' | 'create-journey' | 'safety-buddy'
   | 'journey-review' | 'active-journey' | 'arrival'
@@ -33,7 +33,7 @@ interface CompletedJourney {
   status: 'normal' | 'stopped' | 'offroute' | 'fall'
 }
 
-// â”€â”€â”€ Icon library â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Icon library ─────────────────────────────────────────────────────────────
 const I = {
   home:     <svg viewBox="0 0 24 24" fill="none" className="w-full h-full" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.5z"/><path d="M9 21V12h6v9"/></svg>,
   map:      <svg viewBox="0 0 24 24" fill="none" className="w-full h-full" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>,
@@ -56,7 +56,7 @@ const I = {
   warning:  <svg viewBox="0 0 24 24" fill="none" className="w-full h-full" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
 }
 
-// â”€â”€â”€ Avatar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Avatar ───────────────────────────────────────────────────────────────────
 function Avatar({ name, size = 'md', active = true, online = false }: {
   name: string; size?: 'sm' | 'md' | 'lg'; active?: boolean; online?: boolean
 }) {
@@ -82,7 +82,7 @@ function Avatar({ name, size = 'md', active = true, online = false }: {
   )
 }
 
-// â”€â”€â”€ Status badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Status badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ state, buddyName, label: labelProp }: { state: 'normal' | 'unusual' | 'concern'; buddyName?: string; label?: string }) {
   const cfg = {
     normal:  { cls: 'glass-green', dot: '#3D7A50', text: '#1E4D31', label: 'Everything looks normal' },
@@ -99,7 +99,7 @@ function StatusBadge({ state, buddyName, label: labelProp }: { state: 'normal' |
   )
 }
 
-// â”€â”€â”€ Toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Toggle ───────────────────────────────────────────────────────────────────
 function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
   return (
     <button onClick={() => onChange(!on)} style={{ position: 'relative', width: 48, height: 26, borderRadius: 999, transition: 'all 0.25s', background: on ? 'linear-gradient(135deg, rgba(70,130,88,0.88), rgba(45,95,60,0.94))' : 'rgba(210,205,215,0.50)', border: '1px solid rgba(255,255,255,0.42)', boxShadow: on ? '0 2px 12px rgba(50,100,65,0.28), inset 0 1px 0 rgba(255,255,255,0.22)' : 'inset 0 1px 0 rgba(255,255,255,0.48)', cursor: 'pointer' }}>
@@ -108,7 +108,7 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
   )
 }
 
-// â”€â”€â”€ Bottom nav â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Bottom nav ───────────────────────────────────────────────────────────────
 function BottomNav({ active, onNav }: { active: NavTab; onNav: (t: NavTab) => void }) {
   const tabs: { key: NavTab; icon: keyof typeof I; label: string }[] = [
     { key: 'home',     icon: 'home',     label: 'Home' },
@@ -133,7 +133,7 @@ function BottomNav({ active, onNav }: { active: NavTab; onNav: (t: NavTab) => vo
   )
 }
 
-// â”€â”€â”€ Screen header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Screen header ────────────────────────────────────────────────────────────
 function Header({ title, subtitle, onBack }: { title: string; subtitle?: string; onBack?: () => void }) {
   return (
     <div className="px-5 pt-4 pb-2">
@@ -149,7 +149,7 @@ function Header({ title, subtitle, onBack }: { title: string; subtitle?: string;
   )
 }
 
-// â”€â”€â”€ Glass card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Glass card ───────────────────────────────────────────────────────────────
 function GCard({ children, className = '', tint = 'none', onClick }: {
   children: React.ReactNode; className?: string
   tint?: 'none' | 'pink' | 'blue' | 'green' | 'amber' | 'red'
@@ -161,19 +161,19 @@ function GCard({ children, className = '', tint = 'none', onClick }: {
   )
 }
 
-// â”€â”€â”€ Map loading spinner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Map loading spinner ──────────────────────────────────────────────────────
 function MapLoader() {
   return (
     <div className="h-full flex items-center justify-center glass-1">
       <div className="text-center">
         <div className="w-6 h-6 border-2 border-[#4A7C59] border-t-transparent rounded-full animate-spin mx-auto mb-2"/>
-        <p className="text-xs text-[#7A6860]">Loading mapâ€¦</p>
+        <p className="text-xs text-[#7A6860]">Loading map…</p>
       </div>
     </div>
   )
 }
 
-// â”€â”€â”€ Onboarding â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Onboarding ───────────────────────────────────────────────────────────────
 function Onboarding({ onComplete, onSkip, hasAccount }: { onComplete: () => void; onSkip: () => void; hasAccount: boolean }) {
   const [step, setStep] = useState(0)
 
@@ -280,16 +280,18 @@ function Onboarding({ onComplete, onSkip, hasAccount }: { onComplete: () => void
   )
 }
 
-// â”€â”€â”€ Account Setup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Account Setup ────────────────────────────────────────────────────────────
 function AccountSetup({ onConfirm, onDataPrivacy, initialValues, onValuesChange }: {
   onConfirm: (name: string, email: string, phone: string, password: string) => void
   onDataPrivacy: () => void
   initialValues?: { name: string; email: string; phone: string }
   onValuesChange?: (v: { name: string; email: string; phone: string }) => void
-}) {  const [name, setName] = useState(initialValues?.name ?? '')
+}) {
+  const [name, setName] = useState(initialValues?.name ?? '')
   const [email, setEmail] = useState(initialValues?.email ?? '')
   const [phone, setPhone] = useState(initialValues?.phone ?? '')
   const [password, setPassword] = useState('')
+
   const notify = (n: string, e: string, p: string) => onValuesChange?.({ name: n, email: e, phone: p })
 
   const inputStyle: React.CSSProperties = {
@@ -323,17 +325,18 @@ function AccountSetup({ onConfirm, onDataPrivacy, initialValues, onValuesChange 
             <p style={{ fontSize: 11, fontWeight: 600, color: '#8A7870', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Phone number</p>
             <input style={inputStyle} type="tel" placeholder="+1 555 000 0000" value={phone} onChange={e => { setPhone(e.target.value); notify(name, email, e.target.value) }}/>
           </div>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#8A7870', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Password</p>
+            <input
+              style={inputStyle}
+              type="password"
+              placeholder="Create a password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+          </div>
         </div>
-        <div>
-  <p style={{ fontSize: 11, fontWeight: 600, color: '#8A7870', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Password</p>
-  <input
-    style={inputStyle}
-    type="password"
-    placeholder="Create a password"
-    value={password}
-    onChange={e => setPassword(e.target.value)}
-  />
-</div>
+
         <GCard tint="blue" className="p-4 flex items-start gap-3">
           <div style={{ width: 16, height: 16, color: '#1A4A7A', flexShrink: 0, marginTop: 1 }}>{I.lock}</div>
           <div>
@@ -346,19 +349,19 @@ function AccountSetup({ onConfirm, onDataPrivacy, initialValues, onValuesChange 
       </div>
 
       <div style={{ padding: '12px 24px 48px', position: 'relative', zIndex: 1 }}>
-      <button
-  className="btn-blue"
-  disabled={!name.trim() || !email.trim() || !password}
-  onClick={() => onConfirm(name.trim(), email.trim(), phone.trim(), password)}
->
-  Confirm
-</button>
+        <button
+        className="btn-blue"
+        disabled={!name.trim() || !email.trim() || !password}
+        onClick={() => onConfirm(name.trim(), email.trim(), phone.trim(), password)}
+      >
+        Confirm
+      </button>
       </div>
     </div>
   )
 }
 
-// â”€â”€â”€ Add Trusted Contact â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Add Trusted Contact ──────────────────────────────────────────────────────
 function AddTrustedContact({ onConfirm, onBack, initialData, title = 'Add trusted contact' }: {
   onConfirm: (c: Contact) => void
   onBack: () => void
@@ -408,7 +411,7 @@ function AddTrustedContact({ onConfirm, onBack, initialData, title = 'Add truste
   )
 }
 
-// â”€â”€â”€ Data & Privacy screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Data & Privacy screen ────────────────────────────────────────────────────
 function DataPrivacy({ onBack }: { onBack: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -421,7 +424,7 @@ function DataPrivacy({ onBack }: { onBack: () => void }) {
           { h: 'Name and Phone Number', body: 'We may collect your name and phone number to create and manage your account, identify you within the app, and enable communication and safety features.\n\nYour phone number may also be used to help establish or manage your relationship with your Trusted Contact and to support account verification and security.' },
           { h: 'Trusted Contact Information', body: 'If you designate another person as your Trusted Contact, we may process information necessary to provide the Trusted Contact functionality, such as their name, phone number, account identifier, or device information required to deliver notifications through the app.\n\nYou are responsible for providing accurate information and, where applicable, ensuring that you have the appropriate permission to provide another person\'s personal information to us.' },
           { h: 'Push Notifications', body: 'We use push notifications to provide important safety-related updates to you and your Trusted Contact.\n\nFor example, when you start or stop a location-sharing session, when a safety feature is activated, or when another relevant event occurs, the app may send a notification to the appropriate user.\n\nTo deliver push notifications, we may process technical information associated with the recipient\'s device, such as a device or push-notification token. These tokens are used to route notifications to the correct device and are not used to determine your physical location.' },
-          { h: 'How We Use Your Data', body: 'We may use your personal data to:\n\nâ€˘ provide and operate the app and its safety features;\nâ€˘ collect and share your location with your Trusted Contact when you have enabled location sharing;\nâ€˘ allow Trusted Contacts to view your location during an active safety or location-sharing session;\nâ€˘ send safety-related push notifications and alerts;\nâ€˘ create and manage user accounts;\nâ€˘ verify your identity and secure your account;\nâ€˘ communicate with you about the app and its services;\nâ€˘ detect, prevent, and investigate fraud, misuse, security incidents, or unauthorized access;\nâ€˘ maintain, troubleshoot, and improve the app and its functionality; and\nâ€˘ comply with applicable legal obligations.\n\nWe only use your personal data for purposes that are relevant to providing, securing, and improving our services, or as otherwise permitted or required by applicable law.' },
+          { h: 'How We Use Your Data', body: 'We may use your personal data to:\n\n• provide and operate the app and its safety features;\n• collect and share your location with your Trusted Contact when you have enabled location sharing;\n• allow Trusted Contacts to view your location during an active safety or location-sharing session;\n• send safety-related push notifications and alerts;\n• create and manage user accounts;\n• verify your identity and secure your account;\n• communicate with you about the app and its services;\n• detect, prevent, and investigate fraud, misuse, security incidents, or unauthorized access;\n• maintain, troubleshoot, and improve the app and its functionality; and\n• comply with applicable legal obligations.\n\nWe only use your personal data for purposes that are relevant to providing, securing, and improving our services, or as otherwise permitted or required by applicable law.' },
           { h: 'Your Control Over Location Sharing', body: 'Location sharing is under your control. You can choose whether to start or stop a location-sharing or safety session, subject to the functionality of the app.\n\nWhen location sharing is stopped, we will no longer share your current location with your Trusted Contact through that active session.\n\nYou can also manage or remove your Trusted Contact through the app, where this functionality is available.\n\nFor more information about the types of personal data we collect, the legal bases for processing, how long we retain your data, who we share it with, and your rights, please see our full Privacy Policy.' },
         ].map(s => (
           <div key={s.h}>
@@ -434,7 +437,7 @@ function DataPrivacy({ onBack }: { onBack: () => void }) {
   )
 }
 
-// â”€â”€â”€ Help & Support screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Help & Support screen ────────────────────────────────────────────────────
 function HelpSupport({ onBack }: { onBack: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -458,7 +461,7 @@ function HelpSupport({ onBack }: { onBack: () => void }) {
   )
 }
 
-// â”€â”€â”€ About SafeJourney screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── About SafeJourney screen ─────────────────────────────────────────────────
 function AboutSafeJourney({ onBack }: { onBack: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -480,7 +483,7 @@ function AboutSafeJourney({ onBack }: { onBack: () => void }) {
   )
 }
 
-// â”€â”€â”€ Home â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Home ─────────────────────────────────────────────────────────────────────
 function HomeScreen({ onNav, routeInfo, userName, completedJourneys }: {
   onNav: (s: Screen) => void
   routeInfo: RouteInfo | null
@@ -515,7 +518,7 @@ function HomeScreen({ onNav, routeInfo, userName, completedJourneys }: {
           </div>
           <h2 className="font-display" style={{ color: '#fff', fontSize: 22, marginBottom: 6 }}>Start a Journey</h2>
           <p style={{ color: 'rgba(255,255,255,0.52)', fontSize: 13, lineHeight: 1.55, marginBottom: 20 }}>
-            {routeInfo ? `Continue with your saved route â€” ${routeInfo.name}` : 'Plan your route and choose who should watch over you.'}
+            {routeInfo ? `Continue with your saved route — ${routeInfo.name}` : 'Plan your route and choose who should watch over you.'}
           </p>
           <button className="btn-blue" style={{ width: 'auto', padding: '11px 22px', fontSize: 14 }} onClick={() => onNav('create-journey')}>
             {routeInfo ? 'Edit or start journey' : 'Start Journey'}
@@ -539,7 +542,7 @@ function HomeScreen({ onNav, routeInfo, userName, completedJourneys }: {
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: '#2A1F18' }}>{j.name}</p>
-                  <p style={{ fontSize: 11, color: '#9A8880', marginTop: 2 }}>{j.distanceKm.toFixed(1)} km Â· {j.durationMin} min</p>
+                  <p style={{ fontSize: 11, color: '#9A8880', marginTop: 2 }}>{j.distanceKm.toFixed(1)} km · {j.durationMin} min</p>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
                   <span style={{ fontSize: 11, color: '#A09080' }}>{formatDate(j.completedAt)}</span>
@@ -569,7 +572,7 @@ function HomeScreen({ onNav, routeInfo, userName, completedJourneys }: {
                 style={{ width: 32, height: 32, borderRadius: '50%', border: '1.5px dashed rgba(180,160,150,0.55)', background: 'rgba(255,255,255,0.18)', backdropFilter: 'blur(10px)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
                 <div style={{ width: 12, height: 12, color: '#9A8880' }}>{I.plus}</div>
               </button>
-              <span style={{ fontSize: 10, color: '#8A7870', opacity: 0 }}>Â·</span>
+              <span style={{ fontSize: 10, color: '#8A7870', opacity: 0 }}>·</span>
             </div>
           </div>
         </GCard>
@@ -578,7 +581,7 @@ function HomeScreen({ onNav, routeInfo, userName, completedJourneys }: {
   )
 }
 
-// â”€â”€â”€ Create Journey â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Create Journey ───────────────────────────────────────────────────────────
 function CreateJourney({ onConfirm, onBack }: { onConfirm: (info: RouteInfo) => void; onBack: () => void }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
@@ -592,7 +595,7 @@ function CreateJourney({ onConfirm, onBack }: { onConfirm: (info: RouteInfo) => 
   )
 }
 
-// â”€â”€â”€ Safety Buddy â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Safety Buddy ─────────────────────────────────────────────────────────────
 function SafetyBuddy({ contacts, onNext, onBack, onAddContact }: {
   contacts: Contact[]
   onNext: (buddy: string) => void
@@ -636,7 +639,7 @@ function SafetyBuddy({ contacts, onNext, onBack, onAddContact }: {
   )
 }
 
-// â”€â”€â”€ Journey Review â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Journey Review ───────────────────────────────────────────────────────────
 function JourneyReview({ routeInfo, buddy, onStart, onBack }: {
   routeInfo: RouteInfo | null; buddy: string; onStart: () => void; onBack: () => void
 }) {
@@ -667,12 +670,12 @@ function JourneyReview({ routeInfo, buddy, onStart, onBack }: {
           </div>
           <div style={{ padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
-              { icon: 'đź“Ť', label: 'Route', value: routeInfo ? `${routeInfo.distance.toFixed(2)} km` : '5.2 km' },
-              { icon: 'đź—ş', label: 'Name', value: routeInfo?.name ?? 'Custom Route' },
-              { icon: 'âŹ±', label: 'Estimated duration', value: routeInfo ? `${routeInfo.estimatedMinutes} min` : '35 min' },
-              { icon: 'đź•', label: 'Expected arrival', value: eta },
-              { icon: 'đź‘¤', label: 'Safety buddy', value: buddy },
-              { icon: 'đź”’', label: 'Location sharing', value: 'During journey only' },
+              { icon: '📍', label: 'Route', value: routeInfo ? `${routeInfo.distance.toFixed(2)} km` : '5.2 km' },
+              { icon: '🗺', label: 'Name', value: routeInfo?.name ?? 'Custom Route' },
+              { icon: '⏱', label: 'Estimated duration', value: routeInfo ? `${routeInfo.estimatedMinutes} min` : '35 min' },
+              { icon: '🕐', label: 'Expected arrival', value: eta },
+              { icon: '👤', label: 'Safety buddy', value: buddy },
+              { icon: '🔒', label: 'Location sharing', value: 'During journey only' },
             ].map(item => (
               <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -698,7 +701,7 @@ function JourneyReview({ routeInfo, buddy, onStart, onBack }: {
   )
 }
 
-// â”€â”€â”€ Active Journey â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Active Journey ───────────────────────────────────────────────────────────
 function ActiveJourney({ state, routeInfo, buddy, onNav }: {
   state: JState
   routeInfo: RouteInfo | null
@@ -744,8 +747,8 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
         <div style={{ margin: '8px 14px 0' }}>
           <GCard tint="red" className="px-4 py-3">
             {(isFall
-              ? [['đź“±','Fall detected','Possible fall'],['âŹ°','Expected arrival','overdue']]
-              : [['đź“Ť','Off planned route','420 m'],['âŹ¸','Stationary','8 min'],['âŹ°','Expected arrival','6 min ago']]
+              ? [['📱','Fall detected','Possible fall'],['⏰','Expected arrival','overdue']]
+              : [['📍','Off planned route','420 m'],['⏸','Stationary','8 min'],['⏰','Expected arrival','6 min ago']]
             ).map(([ic, lb, vl]) => (
               <div key={lb} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 <span style={{ fontSize: 13 }}>{ic}</span>
@@ -759,7 +762,7 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
       {isOff && (
         <div style={{ margin: '8px 14px 0' }}>
           <GCard tint="red" className="px-4 py-3 flex items-center gap-2">
-            <span style={{ fontSize: 13 }}>đź“Ť</span>
+            <span style={{ fontSize: 13 }}>📍</span>
             <span style={{ fontSize: 12, color: '#7A6860', flex: 1 }}>Distance from planned route</span>
             <span style={{ fontSize: 12, fontWeight: 700, color: '#8A2020' }}>350 m</span>
           </GCard>
@@ -768,7 +771,7 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
       {isStop && (
         <div style={{ margin: '8px 14px 0' }}>
           <GCard className="px-4 py-3">
-            {[['âŹ¸','Stopped','5 min'],['đź“Ť','Location','Oak Street']].map(([ic,lb,vl]) => (
+            {[['⏸','Stopped','5 min'],['📍','Location','Oak Street']].map(([ic,lb,vl]) => (
               <div key={lb} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                 <span style={{ fontSize: 13 }}>{ic}</span>
                 <span style={{ fontSize: 12, color: '#7A6860', flex: 1 }}>{lb}</span>
@@ -812,7 +815,7 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
   )
 }
 
-// â”€â”€â”€ Safe Arrival â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Safe Arrival ─────────────────────────────────────────────────────────────
 function Arrival({ routeInfo, buddy, onDone, onViewJourneys }: {
   routeInfo: RouteInfo | null; buddy: string; onDone: () => void; onViewJourneys: () => void
 }) {
@@ -863,7 +866,7 @@ function Arrival({ routeInfo, buddy, onDone, onViewJourneys }: {
   )
 }
 
-// â”€â”€â”€ Buddy Web View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Buddy Web View ───────────────────────────────────────────────────────────
 function BuddyWebView({ buddy, onBack }: { routeInfo: RouteInfo | null; buddy: string; onBack: () => void; userName: string }) {
   const runnerName = 'Mika'
   return (
@@ -888,7 +891,7 @@ function BuddyWebView({ buddy, onBack }: { routeInfo: RouteInfo | null; buddy: s
           <Avatar name={runnerName} active online/>
           <div>
             <p style={{ fontWeight: 600, color: '#2A1F18', fontSize: 14 }}>{runnerName}</p>
-            <p style={{ fontSize: 11, color: '#3D6B4F', marginTop: 2 }}>Running Â· Active now</p>
+            <p style={{ fontSize: 11, color: '#3D6B4F', marginTop: 2 }}>Running · Active now</p>
           </div>
         </div>
 
@@ -917,7 +920,7 @@ function BuddyWebView({ buddy, onBack }: { routeInfo: RouteInfo | null; buddy: s
   )
 }
 
-// â”€â”€â”€ Buddy Alert â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Buddy Alert ──────────────────────────────────────────────────────────────
 function BuddyAlert({ onBack }: { routeInfo: RouteInfo | null; onBack: () => void; userName: string }) {
   const runnerName = 'Mika'
   return (
@@ -937,7 +940,7 @@ function BuddyAlert({ onBack }: { routeInfo: RouteInfo | null; onBack: () => voi
 
       <div style={{ flex: 1, padding: '14px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }} className="no-scrollbar">
         <p style={{ fontSize: 13, fontWeight: 600, color: '#2A1F18' }}>What we noticed</p>
-        {[['đź“Ť','Off planned route','350 m'],['âŹ¸','Stationary','7 min'],['âŹ°','ETA overdue','6 min']].map(([ic,lb,vl]) => (
+        {[['📍','Off planned route','350 m'],['⏸','Stationary','7 min'],['⏰','ETA overdue','6 min']].map(([ic,lb,vl]) => (
           <GCard key={lb} tint="amber" className="px-4 py-3 flex items-center gap-2">
             <span style={{ fontSize: 14 }}>{ic}</span>
             <span style={{ fontSize: 13, color: '#7A6860', flex: 1 }}>{lb}</span>
@@ -962,7 +965,7 @@ function BuddyAlert({ onBack }: { routeInfo: RouteInfo | null; onBack: () => voi
   )
 }
 
-// â”€â”€â”€ Buddy Alert Tracking â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Buddy Alert Tracking ─────────────────────────────────────────────────────
 function BuddyAlertTracking({ alertType, onBack }: {
   routeInfo: RouteInfo | null
   alertType: 'offroute' | 'stopped' | 'fall'
@@ -985,7 +988,7 @@ function BuddyAlertTracking({ alertType, onBack }: {
           <div style={{ width: 16, height: 16, color: '#C8DDFB' }}>{I.shield}</div>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#C8DDFB' }}>SafeJourney</span>
         </div>
-        <button onClick={onBack} style={{ fontSize: 11, color: 'rgba(255,255,255,0.60)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>â† Back</button>
+        <button onClick={onBack} style={{ fontSize: 11, color: 'rgba(255,255,255,0.60)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>← Back</button>
       </div>
 
       <div style={{ height: 220, flexShrink: 0, position: 'relative' }}>
@@ -1005,7 +1008,7 @@ function BuddyAlertTracking({ alertType, onBack }: {
           <Avatar name={runnerName} active online/>
           <div>
             <p style={{ fontSize: 14, fontWeight: 600, color: '#2A1F18' }}>{runnerName}</p>
-            <p style={{ fontSize: 12, color: '#7A6860', marginTop: 2 }}>Journey active Â· Safety alert</p>
+            <p style={{ fontSize: 12, color: '#7A6860', marginTop: 2 }}>Journey active · Safety alert</p>
           </div>
         </div>
       </div>
@@ -1022,7 +1025,7 @@ function BuddyAlertTracking({ alertType, onBack }: {
   )
 }
 
-// â”€â”€â”€ Safety Circle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Safety Circle ────────────────────────────────────────────────────────────
 function SafetyCircle({ contacts, onBack, onAddPerson, onEdit, onRemove }: {
   contacts: Contact[]
   onBack: () => void
@@ -1064,7 +1067,7 @@ function SafetyCircle({ contacts, onBack, onAddPerson, onEdit, onRemove }: {
   )
 }
 
-// â”€â”€â”€ Journey History / Your Journeys â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Journey History / Your Journeys ─────────────────────────────────────────
 function History({ onBack, completedJourneys }: { onBack: () => void; completedJourneys: CompletedJourney[] }) {
   const [filter, setFilter] = useState<'all' | 'normal' | 'unusual'>('all')
   const formatDate = (d: Date) => {
@@ -1105,10 +1108,10 @@ function History({ onBack, completedJourneys }: { onBack: () => void; completedJ
                 <p style={{ fontWeight: 600, color: '#2A1F18', fontSize: 13 }}>{j.name}</p>
                 <span style={{ fontSize: 11, color: '#A09080' }}>{formatDate(j.completedAt)}</span>
               </div>
-              <p style={{ fontSize: 11, color: '#8A7870', marginTop: 2 }}>{j.distanceKm.toFixed(1)} km Â· {j.durationMin} min</p>
+              <p style={{ fontSize: 11, color: '#8A7870', marginTop: 2 }}>{j.distanceKm.toFixed(1)} km · {j.durationMin} min</p>
               {j.status !== 'normal' && (
                 <span className="glass-amber" style={{ display: 'inline-block', fontSize: 10, color: '#8A4020', padding: '3px 8px', borderRadius: 8, marginTop: 6 }}>
-                  {j.status === 'offroute' ? 'Route changed Â· User confirmed okay' : j.status === 'stopped' ? 'Stationary alert' : 'Fall detected'}
+                  {j.status === 'offroute' ? 'Route changed · User confirmed okay' : j.status === 'stopped' ? 'Stationary alert' : 'Fall detected'}
                 </span>
               )}
             </div>
@@ -1120,8 +1123,8 @@ function History({ onBack, completedJourneys }: { onBack: () => void; completedJ
   )
 }
 
-// â”€â”€â”€ Buddy Journey View â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Example route for friend's journey (real coords â€” will be replaced with live data in Cursor)
+// ─── Buddy Journey View ───────────────────────────────────────────────────────
+// Example route for friend's journey (real coords — will be replaced with live data in Cursor)
 const BUDDY_EXAMPLE_ROUTE: [number, number][] = [
   [60.1699, 24.9384],
   [60.1715, 24.9412],
@@ -1157,7 +1160,7 @@ function BuddyJourneyView({ buddyJState }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto' }} className="no-scrollbar">
 
-      {/* Header â€” BuddyWebView layout */}
+      {/* Header — BuddyWebView layout */}
       <div className="glass-1" style={{ borderBottom: '1px solid rgba(255,255,255,0.35)', padding: '14px 18px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -1184,7 +1187,7 @@ function BuddyJourneyView({ buddyJState }: {
               <Avatar name={runnerName} active online/>
               <div>
                 <p style={{ fontWeight: 600, color: '#2A1F18', fontSize: 14 }}>{runnerName}</p>
-                <p style={{ fontSize: 11, color: '#3D6B4F', marginTop: 2 }}>Running Â· Active now</p>
+                <p style={{ fontSize: 11, color: '#3D6B4F', marginTop: 2 }}>Running · Active now</p>
               </div>
             </div>
             {[['Started','20:10'],['ETA','20:43'],['Distance','3.1 km / 5.2 km']].map(([l,v]) => (
@@ -1232,7 +1235,7 @@ function BuddyJourneyView({ buddyJState }: {
               <Avatar name={runnerName} active online/>
               <div>
                 <p style={{ fontWeight: 600, color: '#2A1F18', fontSize: 14 }}>{runnerName}</p>
-                <p style={{ fontSize: 11, color: '#7A6860', marginTop: 2 }}>Journey active Â· Safety alert</p>
+                <p style={{ fontSize: 11, color: '#7A6860', marginTop: 2 }}>Journey active · Safety alert</p>
               </div>
             </div>
             <button className="btn-blue">Call {runnerName}</button>
@@ -1243,13 +1246,13 @@ function BuddyJourneyView({ buddyJState }: {
   )
 }
 
-// â”€â”€â”€ Buddy State Picker (demo control) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Buddy State Picker (demo control) ───────────────────────────────────────
 function BuddyStatePicker({ cur, set }: { cur: 'normal' | 'stopped' | 'offroute' | 'fall'; set: (s: 'normal' | 'stopped' | 'offroute' | 'fall') => void }) {
   const opts: { key: 'normal' | 'stopped' | 'offroute' | 'fall'; label: string }[] = [
-    { key: 'normal',   label: 'đźź˘ Normal' },
-    { key: 'stopped',  label: 'đźźˇ Stop' },
-    { key: 'offroute', label: 'đź”´ Off Route' },
-    { key: 'fall',     label: 'đź”´ Fall' },
+    { key: 'normal',   label: '🟢 Normal' },
+    { key: 'stopped',  label: '🟡 Stop' },
+    { key: 'offroute', label: '🔴 Off Route' },
+    { key: 'fall',     label: '🔴 Fall' },
   ]
   return (
     <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.28)', overflowX: 'auto' }} className="no-scrollbar">
@@ -1261,7 +1264,7 @@ function BuddyStatePicker({ cur, set }: { cur: 'normal' | 'stopped' | 'offroute'
   )
 }
 
-// â”€â”€â”€ Tracking Screen (buddy view) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Tracking Screen (buddy view) ─────────────────────────────────────────────
 function TrackingScreen({ journeyActive, routeInfo, userName, buddyJState, setBuddyJState }: {
   journeyActive: boolean
   routeInfo: RouteInfo | null
@@ -1294,7 +1297,7 @@ function TrackingScreen({ journeyActive, routeInfo, userName, buddyJState, setBu
   )
 }
 
-// â”€â”€â”€ Profile â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Profile ──────────────────────────────────────────────────────────────────
 function Profile({ onBack, onSettings, userName, userEmail, onDataPrivacy, onDeleteAccount }: {
   onBack: () => void; onSettings: () => void
   userName: string; userEmail: string
@@ -1359,8 +1362,8 @@ function Profile({ onBack, onSettings, userName, userEmail, onDataPrivacy, onDel
   )
 }
 
-// â”€â”€â”€ Settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// â”€â”€â”€ Subscription Plan Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Settings ─────────────────────────────────────────────────────────────────
+// ─── Subscription Plan Screen ─────────────────────────────────────────────────
 function SubscriptionPlanScreen({ onSubscribe }: { onSubscribe: () => void }) {
   const features = [
     'Unlimited journeys',
@@ -1384,10 +1387,10 @@ function SubscriptionPlanScreen({ onSubscribe }: { onSubscribe: () => void }) {
 
         <GCard className="p-5">
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 4 }}>
-            <span className="font-display" style={{ fontSize: 36, color: '#2A1F18', letterSpacing: '-0.02em' }}>4,99 â‚¬</span>
+            <span className="font-display" style={{ fontSize: 36, color: '#2A1F18', letterSpacing: '-0.02em' }}>4,99 €</span>
             <span style={{ fontSize: 13, color: '#A09080' }}>/ month</span>
           </div>
-          <p style={{ fontSize: 12, color: '#8A7870', marginBottom: 16 }}>Monthly subscription Â· Cancel anytime</p>
+          <p style={{ fontSize: 12, color: '#8A7870', marginBottom: 16 }}>Monthly subscription · Cancel anytime</p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {features.map(f => (
               <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1406,13 +1409,13 @@ function SubscriptionPlanScreen({ onSubscribe }: { onSubscribe: () => void }) {
       </div>
 
       <div style={{ padding: '12px 24px 48px', position: 'relative', zIndex: 1 }}>
-        <button className="btn-blue" onClick={onSubscribe}>Subscribe â€” 4,99 â‚¬ / month</button>
+        <button className="btn-blue" onClick={onSubscribe}>Subscribe — 4,99 € / month</button>
       </div>
     </div>
   )
 }
 
-// â”€â”€â”€ Payment Method Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Payment Method Screen ────────────────────────────────────────────────────
 function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; onBack: () => void }) {
   const [method, setMethod] = useState<'card' | 'paypal'>('card')
   const [cardName, setCardName] = useState('')
@@ -1444,9 +1447,9 @@ function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; o
         <GCard tint="blue" className="px-4 py-3 flex items-center justify-between">
           <div>
             <p style={{ fontSize: 13, fontWeight: 600, color: '#1A3A6A' }}>SafeJourney Monthly</p>
-            <p style={{ fontSize: 11, color: '#3A6A9A', marginTop: 2 }}>Billed monthly Â· Cancel anytime</p>
+            <p style={{ fontSize: 11, color: '#3A6A9A', marginTop: 2 }}>Billed monthly · Cancel anytime</p>
           </div>
-          <span className="font-display" style={{ fontSize: 20, color: '#1A3A6A', letterSpacing: '-0.01em' }}>4,99 â‚¬</span>
+          <span className="font-display" style={{ fontSize: 20, color: '#1A3A6A', letterSpacing: '-0.01em' }}>4,99 €</span>
         </GCard>
 
         {/* Method selector */}
@@ -1455,7 +1458,7 @@ function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; o
           <div style={{ display: 'flex', gap: 10 }}>
             {(['card', 'paypal'] as const).map(m => (
               <button key={m} onClick={() => setMethod(m)} style={{ flex: 1, padding: '12px', borderRadius: 16, fontSize: 13, fontWeight: 600, fontFamily: 'Outfit,sans-serif', cursor: 'pointer', transition: 'all 0.15s', ...(method === m ? { background: 'rgba(200,221,251,0.60)', color: '#0A1A3A', border: '1.5px solid rgba(160,200,255,0.65)', backdropFilter: 'blur(14px)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.62)' } : { background: 'rgba(255,255,255,0.30)', color: '#5A4A40', border: '1px solid rgba(255,255,255,0.55)', backdropFilter: 'blur(12px)' }) }}>
-                {m === 'card' ? 'đź’ł Debit Card' : 'đź…żď¸Ź PayPal'}
+                {m === 'card' ? '💳 Debit Card' : '🅿️ PayPal'}
               </button>
             ))}
           </div>
@@ -1479,7 +1482,7 @@ function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; o
               </div>
               <div>
                 <p style={{ fontSize: 11, fontWeight: 600, color: '#8A7870', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>CVV</p>
-                <input style={inputStyle} type="text" placeholder="â€˘â€˘â€˘" value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g,'').slice(0,4))} inputMode="numeric"/>
+                <input style={inputStyle} type="text" placeholder="•••" value={cardCvv} onChange={e => setCardCvv(e.target.value.replace(/\D/g,'').slice(0,4))} inputMode="numeric"/>
               </div>
             </div>
           </div></GCard>
@@ -1489,11 +1492,11 @@ function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; o
         {method === 'paypal' && (
           <GCard className="p-5"><div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14, alignItems: 'center' }}>
             <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(0,70,180,0.10)', border: '1px solid rgba(0,70,180,0.18)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 24 }}>đź…żď¸Ź</span>
+              <span style={{ fontSize: 24 }}>🅿️</span>
             </div>
             <div>
               <p style={{ fontSize: 14, fontWeight: 600, color: '#2A1F18', marginBottom: 4 }}>Pay with PayPal</p>
-              <p style={{ fontSize: 12, color: '#7A6860', lineHeight: 1.55 }}>You'll be redirected to PayPal to authorise your subscription of 4,99 â‚¬ / month.</p>
+              <p style={{ fontSize: 12, color: '#7A6860', lineHeight: 1.55 }}>You'll be redirected to PayPal to authorise your subscription of 4,99 € / month.</p>
             </div>
           </div></GCard>
         )}
@@ -1506,14 +1509,14 @@ function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; o
 
       <div style={{ padding: '12px 16px 36px' }}>
         <button className="btn-blue" disabled={!canPay} onClick={onComplete}>
-          {method === 'paypal' ? 'Continue to PayPal' : 'Pay 4,99 â‚¬ and subscribe'}
+          {method === 'paypal' ? 'Continue to PayPal' : 'Pay 4,99 € and subscribe'}
         </button>
       </div>
     </div>
   )
 }
 
-// â”€â”€â”€ Subscription Settings Screen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Subscription Settings Screen ─────────────────────────────────────────────
 function SubscriptionSettingsScreen({ onBack, isSubscribed, onCancelConfirm }: {
   onBack: () => void
   isSubscribed: boolean
@@ -1535,7 +1538,7 @@ function SubscriptionSettingsScreen({ onBack, isSubscribed, onCancelConfirm }: {
             <div>
               <p style={{ fontSize: 15, fontWeight: 600, color: '#2A1F18' }}>SafeJourney Monthly</p>
               <p style={{ fontSize: 12, color: isSubscribed ? '#3D7A50' : '#A09080', marginTop: 2 }}>
-                {isSubscribed ? 'â—Ź Active' : 'â—‹ Cancelled'}
+                {isSubscribed ? '● Active' : '○ Cancelled'}
               </p>
             </div>
           </div>
@@ -1546,7 +1549,7 @@ function SubscriptionSettingsScreen({ onBack, isSubscribed, onCancelConfirm }: {
           <p style={{ fontSize: 10, fontWeight: 700, color: '#A09080', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, paddingLeft: 4 }}>Plan details</p>
           <GCard>
             {[
-              ['Price', '4,99 â‚¬ / month'],
+              ['Price', '4,99 € / month'],
               ['Billing', 'Monthly'],
               ['Journeys', 'Unlimited'],
               ['Safety buddies', '5'],
@@ -1668,7 +1671,7 @@ function Settings({ onBack, onHelpSupport, defaultDuration, onDefaultDuration, o
             <div onClick={onSubscription} style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 13, fontWeight: 500, color: '#2A1F18' }}>Subscription</p>
-                <p style={{ fontSize: 11, color: '#A09080', marginTop: 2 }}>Monthly Â· 4,99 â‚¬</p>
+                <p style={{ fontSize: 11, color: '#A09080', marginTop: 2 }}>Monthly · 4,99 €</p>
               </div>
               <div style={{ width: 16, height: 16, color: '#C0B0A8' }}>{I.chevron}</div>
             </div>
@@ -1695,7 +1698,7 @@ function Settings({ onBack, onHelpSupport, defaultDuration, onDefaultDuration, o
   )
 }
 
-// â”€â”€â”€ Delete Confirm Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
 function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; onCancel: () => void }) {
   return (
     <div style={{ position: 'absolute', inset: 0, zIndex: 100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: 'rgba(30,20,16,0.52)', backdropFilter: 'blur(8px)' }}>
@@ -1716,7 +1719,7 @@ function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => void; on
   )
 }
 
-// â”€â”€â”€ Duration Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Duration Modal ───────────────────────────────────────────────────────────
 function DurationModal({ current, currentMode, onConfirm, onCancel }: {
   current: { hours: number; minutes: number }
   currentMode: 'maps' | 'fixed'
@@ -1769,13 +1772,13 @@ function DurationModal({ current, currentMode, onConfirm, onCancel }: {
   )
 }
 
-// â”€â”€â”€ Journey state picker (demo control) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Journey state picker (demo control) ─────────────────────────────────────
 function JourneyStatePicker({ cur, set }: { cur: JState; set: (s: JState) => void }) {
   const opts: { key: JState; label: string }[] = [
-    { key: 'normal',             label: 'đźź˘ Normal' },
-    { key: 'unusual-stationary', label: 'đźźˇ Stop' },
-    { key: 'unusual-offroute',   label: 'đź”´ Off route' },
-    { key: 'concern-fall',       label: 'đź”´ Fall' },
+    { key: 'normal',             label: '🟢 Normal' },
+    { key: 'unusual-stationary', label: '🟡 Stop' },
+    { key: 'unusual-offroute',   label: '🔴 Off route' },
+    { key: 'concern-fall',       label: '🔴 Fall' },
   ]
   return (
     <div style={{ display: 'flex', gap: 6, padding: '8px 12px', background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(255,255,255,0.28)', overflowX: 'auto' }} className="no-scrollbar">
@@ -1787,7 +1790,7 @@ function JourneyStatePicker({ cur, set }: { cur: JState; set: (s: JState) => voi
   )
 }
 
-// â”€â”€â”€ Notification Demo Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Notification Demo Panel ──────────────────────────────────────────────────
 function NotifDemoPanel({ onClose, onTap }: {
   userName: string
   onClose: () => void
@@ -1795,15 +1798,15 @@ function NotifDemoPanel({ onClose, onTap }: {
 }) {
   const runnerName = 'Mika'
   const tiles: { state: 'normal' | 'stopped' | 'offroute' | 'fall'; title: string; body: string }[] = [
-    { state: 'offroute', title: `âš ď¸Ź ${runnerName} is off route`, body: `${runnerName} has moved outside the planned route.` },
-    { state: 'stopped',  title: `âš ď¸Ź ${runnerName} has stopped`, body: `${runnerName} hasn't moved for 8 minutes.` },
-    { state: 'fall',     title: 'đźš¨ Possible fall detected', body: `A possible fall was detected during ${runnerName}'s journey.` },
+    { state: 'offroute', title: `⚠️ ${runnerName} is off route`, body: `${runnerName} has moved outside the planned route.` },
+    { state: 'stopped',  title: `⚠️ ${runnerName} has stopped`, body: `${runnerName} hasn't moved for 8 minutes.` },
+    { state: 'fall',     title: '🚨 Possible fall detected', body: `A possible fall was detected during ${runnerName}'s journey.` },
   ]
   return (
     <div style={{ position: 'absolute', bottom: 70, left: '50%', transform: 'translateX(-50%)', zIndex: 200, width: 340, display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 4px' }}>
         <p style={{ fontSize: 10, color: 'rgba(255,255,255,0.50)', fontStyle: 'italic' }}>~ Approximate platform notification examples</p>
-        <button onClick={onClose} style={{ fontSize: 12, color: 'rgba(255,255,255,0.60)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>âś•</button>
+        <button onClick={onClose} style={{ fontSize: 12, color: 'rgba(255,255,255,0.60)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>✕</button>
       </div>
       {tiles.map(t => (
         <button key={t.state} onClick={() => onTap(t.state)}
@@ -1816,7 +1819,7 @@ function NotifDemoPanel({ onClose, onTap }: {
   )
 }
 
-// â”€â”€â”€ Screen picker (demo control) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Screen picker (demo control) ────────────────────────────────────────────
 function ScreenPicker({ cur, onPick }: { cur: Screen; onPick: (s: Screen) => void }) {
   const [open, setOpen] = useState(false)
   const items: { key: Screen; label: string }[] = [
@@ -1862,7 +1865,7 @@ function ScreenPicker({ cur, onPick }: { cur: Screen; onPick: (s: Screen) => voi
   )
 }
 
-// â”€â”€â”€ Helper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── Helper ───────────────────────────────────────────────────────────────────
 function jStateToStatus(j: JState): 'normal' | 'stopped' | 'offroute' | 'fall' {
   if (j === 'unusual-stationary') return 'stopped'
   if (j === 'unusual-offroute') return 'offroute'
@@ -1870,7 +1873,7 @@ function jStateToStatus(j: JState): 'normal' | 'stopped' | 'offroute' | 'fall' {
   return 'normal'
 }
 
-// â”€â”€â”€ App root â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── App root ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [onboarding, setOnboarding] = useState(true)
   const [screen, setScreen] = useState<Screen>('home')
@@ -1991,7 +1994,7 @@ export default function App() {
         <div style={{ position: 'relative', zIndex: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 28px 6px', height: 44 }}>
           <span style={{ fontSize: 12, fontWeight: 600, color: '#2A1F18' }}>9:41</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 500, color: '#4A3830' }}>
-            <span>â—Źâ—Źâ—Ź</span><span>WiFi</span><span>â– </span>
+            <span>●●●</span><span>WiFi</span><span>■</span>
           </div>
         </div>
 
@@ -2008,32 +2011,32 @@ export default function App() {
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
                 {screen === 'account-setup' && (
                   <AccountSetup
-                  onConfirm={async (name, email, phone, password) => {
-                    const { data, error } = await supabase.auth.signUp({
-                      email,
-                      password,
-                      options: {
-                        data: {
-                          full_name: name,
-                          phone,
+                    onConfirm={async (name, email, phone, password) => {
+                      const { data, error } = await supabase.auth.signUp({
+                        email,
+                        password,
+                        options: {
+                          data: {
+                            full_name: name,
+                            phone,
+                          },
                         },
-                      },
-                    })
-                  
-                    if (error) {
-                      console.error('Supabase signup error:', error)
-                      return
-                    }
-                  
-                    setUserName(name || 'Petra')
-                    setUserEmail(email)
-                    setUserPhone(phone)
-                    setHasAccount(true)
-                  
-                    if (data.user) {
-                      go('subscription-plan')
-                    }
-                  }}
+                      })
+
+                      if (error) {
+                        console.error('Supabase signup error:', error)
+                        return
+                      }
+
+                      setUserName(name || 'Petra')
+                      setUserEmail(email)
+                      setUserPhone(phone)
+                      setHasAccount(true)
+
+                      if (data.user) {
+                        go('subscription-plan')
+                      }
+                    }}
                     onDataPrivacy={() => { setDataPrivacyFrom('account-setup'); go('data-privacy') }}
                     initialValues={accountDraft}
                     onValuesChange={setAccountDraft}
@@ -2209,7 +2212,7 @@ export default function App() {
           />
         )}
 
-        {/* Demo controls â€” inside the phone frame so buttons are tappable in preview */}
+        {/* Demo controls — inside the phone frame so buttons are tappable in preview */}
         <div style={{ position: 'absolute', bottom: 80, left: '50%', transform: 'translateX(-50%)', zIndex: 9999, display: 'flex', alignItems: 'center', gap: 10, padding: '10px 16px', borderRadius: 20, background: 'rgba(14,10,8,0.80)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.10)', whiteSpace: 'nowrap' }}>
           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.38)', fontWeight: 600, letterSpacing: '0.04em' }}>SAFEJOURNEY</span>
           <div style={{ width: 1, height: 16, background: 'rgba(255,255,255,0.15)' }}/>
@@ -2221,11 +2224,11 @@ export default function App() {
           )}
           <button onClick={() => setJourneyActive(j => !j)}
             style={{ fontSize: 11, color: journeyActive ? 'rgba(93,187,122,0.90)' : 'rgba(255,255,255,0.50)', padding: '5px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.16)', cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
-            {journeyActive ? 'đźź˘ Journey active' : 'Journey off'}
+            {journeyActive ? '🟢 Journey active' : 'Journey off'}
           </button>
           <button onClick={() => setShowNotifDemo(v => !v)}
             style={{ fontSize: 11, color: showNotifDemo ? 'rgba(249,221,209,0.90)' : 'rgba(255,255,255,0.50)', padding: '5px 12px', borderRadius: 10, background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.16)', cursor: 'pointer', fontFamily: 'Outfit,sans-serif' }}>
-            đź””
+            🔔
           </button>
           <ScreenPicker cur={screen} onPick={pickScreen}/>
         </div>
@@ -2233,4 +2236,3 @@ export default function App() {
     </div>
   )
 }
-
