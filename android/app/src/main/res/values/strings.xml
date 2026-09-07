@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">SafeJourney</string>
+    <string name="title_activity_main">SafeJourney</string>
+    <string name="package_name">com.safejourney.app</string>
+    <string name="custom_url_scheme">com.safejourney.app</string>
+</resources>
