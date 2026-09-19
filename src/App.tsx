@@ -2027,6 +2027,18 @@ export default function App() {
                         console.error('Supabase signup error:', error)
                         return
                       }
+                      
+                      if (!data.session) {
+                        const { error: signInError } = await supabase.auth.signInWithPassword({
+                          email,
+                          password,
+                        })
+                      
+                        if (signInError) {
+                          console.error('Supabase sign-in error:', signInError)
+                          return
+                        }
+                      }
 
                       setUserName(name || 'Petra')
                       setUserEmail(email)
@@ -2156,7 +2168,39 @@ export default function App() {
                 )}
                 {screen === 'payment-method' && (
                   <PaymentMethodScreen
-                    onComplete={() => { setIsSubscribed(true); go('home') }}
+                  onComplete={async () => {
+                    const { data: { session } } = await supabase.auth.getSession()
+
+console.log('Supabase session:', session)
+
+if (!session?.user) {
+  console.error('No authenticated user found')
+  return
+}
+
+const user = session.user
+                  
+                    if (!user) {
+                      console.error('No authenticated user found')
+                      return
+                    }
+                  
+                    const { error } = await supabase
+                      .from('subscriptions')
+                      .insert({
+                        user_id: user.id,
+                        provider: 'stripe',
+                        status: 'active',
+                      })
+                  
+                    if (error) {
+                      console.error('Subscription save error:', error)
+                      return
+                    }
+                  
+                    setIsSubscribed(true)
+                    go('home')
+                  }}
                     onBack={() => go('subscription-plan')}
                   />
                 )}
