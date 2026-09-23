@@ -603,7 +603,12 @@ function SafetyBuddy({ contacts, onNext, onBack, onAddContact }: {
   onAddContact: () => void
 }) {
   const [sel, setSel] = useState(contacts[0]?.name ?? '')
-  useEffect(() => { if (!contacts.find(c => c.name === sel) && contacts.length) setSel(contacts[0].name) }, [contacts])
+  useEffect(() => {
+    if (!contacts.find(c => c.name === sel) && contacts.length) {
+      setSel(contacts[0].name)
+    }
+  }, [contacts])
+   
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -632,6 +637,7 @@ function SafetyBuddy({ contacts, onNext, onBack, onAddContact }: {
           Add trusted contact
         </button>
       </div>
+
       <div style={{ padding: '12px 16px 24px' }}>
         <button className="btn-blue" onClick={() => onNext(sel)}>Continue with {sel}</button>
       </div>
@@ -1441,7 +1447,16 @@ function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; o
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Payment" onBack={onBack}/>
-      <div style={{ flex: 1, minHeight: 0, padding: '4px 16px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }} className="no-scrollbar">
+<div style={{ flex: 1, minHeight: 0, padding: '4px 16px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }} className="no-scrollbar">
+
+  <GCard tint="amber" className="p-4">
+    <p style={{ fontSize: 12, fontWeight: 600, color: '#6A3800', marginBottom: 2 }}>Demo mode</p>
+    <p style={{ fontSize: 12, color: '#8A4020', lineHeight: 1.5 }}>
+      This is a portfolio demo — no real payment is processed.
+    </p>
+  </GCard>
+
+  {/* Order summary */}
 
         {/* Order summary */}
         <GCard tint="blue" className="px-4 py-3 flex items-center justify-between">
@@ -1886,7 +1901,7 @@ export default function App() {
   // User account
   const [hasAccount, setHasAccount] = useState(false)
   const [accountDraft, setAccountDraft] = useState({ name: '', email: '', phone: '' })
-  const [isSubscribed, setIsSubscribed] = useState(false)
+  
   const [userName, setUserName] = useState('Petra')
   const [userEmail, setUserEmail] = useState('')
   const [userPhone, setUserPhone] = useState('')
@@ -1897,6 +1912,30 @@ export default function App() {
     { name: 'Sara', phone: '', role: 'Sister' },
     { name: 'Marko', phone: '', role: 'Partner' },
   ])
+  const [isSubscribed, setIsSubscribed] = useState(false)
+  useEffect(() => {
+    const loadSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+  
+      if (!user) return
+  
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('status')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle()
+  
+      if (error) {
+        console.error('Subscription load error:', error)
+        return
+      }
+  
+      setIsSubscribed(!!data)
+    }
+  
+    loadSubscription()
+  }, [])
   const [addContactReturn, setAddContactReturn] = useState<Screen>('safety-buddy')
   const [editContactIndex, setEditContactIndex] = useState<number | null>(null)
 
@@ -2171,9 +2210,7 @@ export default function App() {
                   onComplete={async () => {
                     const { data: { session } } = await supabase.auth.getSession()
 
-console.log('Supabase session:', session)
-
-if (!session?.user) {
+                    if (!session?.user) {
   console.error('No authenticated user found')
   return
 }
@@ -2186,12 +2223,11 @@ const user = session.user
                     }
                   
                     const { error } = await supabase
-                      .from('subscriptions')
-                      .insert({
-                        user_id: user.id,
-                        provider: 'stripe',
-                        status: 'active',
-                      })
+                    .from('subscriptions')
+                    .upsert(
+                      { user_id: user.id, provider: 'stripe', status: 'active' },
+                      { onConflict: 'user_id' }
+                    )
                   
                     if (error) {
                       console.error('Subscription save error:', error)
