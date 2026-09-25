@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Polyline, CircleMarker, useMapEvents, useMap }
 import 'leaflet/dist/leaflet.css'
 
 // ─── Geo helpers ───────────────────────────────────────────────────────────────
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const R = 6371
   const dLat = ((lat2 - lat1) * Math.PI) / 180
   const dLon = ((lon2 - lon1) * Math.PI) / 180
@@ -204,29 +204,11 @@ export function MapPlanner({ onConfirm }: { onConfirm: (info: RouteInfo) => void
 }
 
 // ─── Active Journey Map ───────────────────────────────────────────────────────
-export function ActiveJourneyMap({ route, onOffRoute }: {
+export function ActiveJourneyMap({ route, currentPos }: {
   route: [number, number][]
-  onOffRoute?: (isOff: boolean, distanceMeters: number) => void
+  currentPos?: [number, number] | null
 }) {
-  const [currentPos, setCurrentPos] = useState<[number, number] | null>(null)
   const center: [number, number] = currentPos || (route.length > 0 ? route[0] : [51.505, -0.09])
-
-  useEffect(() => {
-    if (!navigator.geolocation) return
-    const id = navigator.geolocation.watchPosition(
-      (pos) => {
-        const p: [number, number] = [pos.coords.latitude, pos.coords.longitude]
-        setCurrentPos(p)
-        if (route.length > 1 && onOffRoute) {
-          const distKm = nearestPointDist(p, route)
-          onOffRoute(distKm > 0.15, Math.round(distKm * 1000))
-        }
-      },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 5000 }
-    )
-    return () => navigator.geolocation.clearWatch(id)
-  }, [route]) // eslint-disable-line
 
   return (
     <MapContainer center={center} zoom={15} style={{ height: '100%', width: '100%' }} zoomControl={false}>

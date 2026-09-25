@@ -10,9 +10,10 @@
     "format": "oxfmt"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.1",
-    "@capacitor/cli": "^8.5.0",
-    "@capacitor/core": "^8.5.0",
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/cli": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/geolocation": "^8.2.2",
     "@supabase/supabase-js": "^2.115.0",
     "leaflet": "^1.9.4",
     "react": "^19.0.0",

@@ -8,12 +8,23 @@
 
 * { box-sizing: border-box; }
 
+html, body, #root {
+  height: 100%;
+  width: 100%;
+}
+
 body {
   font-family: 'Outfit', sans-serif;
   background: #0F0E0C;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
 }
 
 ::-webkit-scrollbar { width: 0; height: 0; }

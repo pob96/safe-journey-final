@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react'
 import { supabase } from './supabase'
 import type { RouteInfo } from './MapPlanner'
-import { StaticFallbackMap, ACTIVITY_EMOJIS, OnboardingMapVisual } from './MapPlanner'
+import { StaticFallbackMap, ACTIVITY_EMOJIS, OnboardingMapVisual, haversine } from './MapPlanner'
 
 // Lazy-load heavy map components
 const MapPlanner = lazy(() => import('./MapPlanner').then(m => ({ default: m.MapPlanner })))
@@ -16,15 +16,18 @@ type Screen =
   | 'account-setup' | 'add-contact' | 'data-privacy' | 'help-support'
   | 'your-journeys' | 'tracking' | 'buddy-alert-tracking' | 'about'
   | 'subscription-plan' | 'payment-method' | 'subscription-settings'
+  | 'login' | 'invite-code' | 'enter-invite-code'
 
 type NavTab = 'home' | 'tracking' | 'circle' | 'activity' | 'profile'
 
 type JState = 'normal' | 'unusual-stationary' | 'unusual-offroute' | 'concern-fall'
 
-interface Contact { name: string; phone: string; role: string }
+const ACTIVITY_SPEEDS: Record<string, number> = { run: 8, walk: 5, hike: 4, cycle: 16 } // km/h
+
+interface Contact { id: string; name: string; phone: string; role: string; pairedUserId: string | null }
 
 interface CompletedJourney {
-  id: number
+  id: string
   name: string
   activityType: string
   distanceKm: number
@@ -281,11 +284,13 @@ function Onboarding({ onComplete, onSkip, hasAccount }: { onComplete: () => void
 }
 
 // ─── Account Setup ────────────────────────────────────────────────────────────
-function AccountSetup({ onConfirm, onDataPrivacy, initialValues, onValuesChange }: {
+function AccountSetup({ onConfirm, onDataPrivacy, initialValues, onValuesChange, onGoToLogin, error }: {
   onConfirm: (name: string, email: string, phone: string, password: string) => void
   onDataPrivacy: () => void
   initialValues?: { name: string; email: string; phone: string }
   onValuesChange?: (v: { name: string; email: string; phone: string }) => void
+  onGoToLogin: () => void
+  error?: string
 }) {
   const [name, setName] = useState(initialValues?.name ?? '')
   const [email, setEmail] = useState(initialValues?.email ?? '')
@@ -346,6 +351,16 @@ function AccountSetup({ onConfirm, onDataPrivacy, initialValues, onValuesChange 
             </p>
           </div>
         </GCard>
+
+        {error && (
+          <GCard tint="red" className="p-3">
+            <p style={{ fontSize: 12, color: '#8A2020' }}>{error}</p>
+          </GCard>
+        )}
+
+        <button onClick={onGoToLogin} style={{ fontSize: 13, color: '#3D6B4F', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center' }}>
+          Already have an account? Log in
+        </button>
       </div>
 
       <div style={{ padding: '12px 24px 48px', position: 'relative', zIndex: 1 }}>
@@ -360,10 +375,91 @@ function AccountSetup({ onConfirm, onDataPrivacy, initialValues, onValuesChange 
     </div>
   )
 }
+// ─── Login ─────────────────────────────────────────────────────────────────
+function Login({ onLoginSuccess, onGoToSignup }: {
+  onLoginSuccess: (name: string, email: string, phone: string) => void
+  onGoToSignup: () => void
+}) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '14px 16px', borderRadius: 16, fontSize: 14, fontFamily: 'Outfit,sans-serif', color: '#2A1F18',
+    background: 'rgba(255,255,255,0.42)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+    border: '1px solid rgba(255,255,255,0.62)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.72)',
+    outline: 'none',
+  }
+
+  const handleLogin = async () => {
+    setError('')
+    setLoading(true)
+    const { data, error } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
+    setLoading(false)
+
+    if (error) {
+      if (error.message.includes('Invalid login credentials')) {
+        setError('Incorrect email or password.')
+      } else if (error.message.includes('Email not confirmed')) {
+        setError('Please confirm your email before logging in.')
+      } else {
+        setError(error.message)
+      }
+      return
+    }
+
+    if (data.user) {
+      const name = (data.user.user_metadata?.full_name as string) || 'Petra'
+      const phone = (data.user.user_metadata?.phone as string) || ''
+      onLoginSuccess(name, data.user.email ?? '', phone)
+    }
+  }
+
+  return (
+    <div className="flex flex-col min-h-full app-bg" style={{ position: 'relative' }}>
+      <div style={{ position: 'absolute', top: -40, left: -40, width: 200, height: 200, borderRadius: '50%', background: 'radial-gradient(circle, rgba(249,221,209,0.50) 0%, transparent 70%)', pointerEvents: 'none' }}/>
+      <div style={{ position: 'absolute', top: 180, right: -40, width: 160, height: 160, borderRadius: '50%', background: 'radial-gradient(circle, rgba(200,221,251,0.42) 0%, transparent 70%)', pointerEvents: 'none' }}/>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', padding: '64px 24px 24px', gap: 24, position: 'relative', zIndex: 1, overflowY: 'auto' }} className="no-scrollbar">
+        <div>
+          <h1 className="font-display" style={{ fontSize: 36, color: '#2A1F18', lineHeight: 1.15, marginBottom: 8 }}>Welcome back</h1>
+          <p style={{ fontSize: 14, color: '#5A4A40', lineHeight: 1.6 }}>Log in to continue your journey.</p>
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#8A7870', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Email</p>
+            <input style={inputStyle} type="email" placeholder="your@email.com" value={email} onChange={e => setEmail(e.target.value)}/>
+          </div>
+          <div>
+            <p style={{ fontSize: 11, fontWeight: 600, color: '#8A7870', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Password</p>
+            <input style={inputStyle} type="password" placeholder="Your password" value={password} onChange={e => setPassword(e.target.value)}/>
+          </div>
+        </div>
+
+        {error && (
+          <GCard tint="red" className="p-3">
+            <p style={{ fontSize: 12, color: '#8A2020' }}>{error}</p>
+          </GCard>
+        )}
+
+        <button onClick={onGoToSignup} style={{ fontSize: 13, color: '#3D6B4F', fontWeight: 600, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'center' }}>
+          Don't have an account? Sign up
+        </button>
+      </div>
+
+      <div style={{ padding: '12px 24px 48px', position: 'relative', zIndex: 1 }}>
+        <button className="btn-blue" disabled={!email.trim() || !password || loading} onClick={handleLogin}>
+          {loading ? 'Logging in…' : 'Log in'}
+        </button>
+      </div>
+    </div>
+  )
+}
 // ─── Add Trusted Contact ──────────────────────────────────────────────────────
 function AddTrustedContact({ onConfirm, onBack, initialData, title = 'Add trusted contact' }: {
-  onConfirm: (c: Contact) => void
+  onConfirm: (c: Omit<Contact, 'id'>) => void
   onBack: () => void
   initialData?: Contact
   title?: string
@@ -714,6 +810,52 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
   buddy: string
   onNav: (s: Screen) => void
 }) {
+  // (liveGPS/gpsError already declared below in the existing useEffect block)
+  const [liveGPS, setLiveGPS] = useState<{ lat: number; lng: number } | null>(null)
+  const [gpsError, setGpsError] = useState('')
+
+  useEffect(() => {
+    let watchId: string | null = null
+
+    const startWatching = async () => {
+      try {
+        const { Geolocation } = await import('@capacitor/geolocation')
+        const permission = await Geolocation.requestPermissions()
+
+        if (permission.location !== 'granted' && permission.coarseLocation !== 'granted') {
+          setGpsError('Location permission denied.')
+          return
+        }
+
+        watchId = await Geolocation.watchPosition(
+          { enableHighAccuracy: true, timeout: 10000 },
+          (position, err) => {
+            if (err) {
+              console.error('GPS watch error:', err)
+              setGpsError('Unable to get your location.')
+              return
+            }
+            if (position) {
+              setLiveGPS({ lat: position.coords.latitude, lng: position.coords.longitude })
+            }
+          }
+        )
+      } catch (e) {
+        console.error('Geolocation setup error:', e)
+        setGpsError('Location is not available on this device.')
+      }
+    }
+
+    startWatching()
+
+    return () => {
+      if (watchId) {
+        import('@capacitor/geolocation').then(({ Geolocation }) => {
+          Geolocation.clearWatch({ id: watchId! })
+        })
+      }
+    }
+  }, [])
   const isNormal  = state === 'normal'
   const isStop    = state === 'unusual-stationary'
   const isOff     = state === 'unusual-offroute'
@@ -724,6 +866,13 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+            {gpsError && (
+        <div style={{ margin: '12px 14px 0' }}>
+          <GCard tint="amber" className="px-4 py-2.5">
+            <p style={{ fontSize: 12, color: '#8A4020' }}>{gpsError}</p>
+          </GCard>
+        </div>
+      )}
       <div style={{ margin: '12px 14px 8px' }}>
         <GCard tint={bannerTint} className="px-4 py-3">
           {isNormal  && <StatusBadge state="normal" buddyName={buddy}/>}
@@ -740,9 +889,9 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
       </div>
 
       <div style={{ margin: '0 14px', borderRadius: 20, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.48)', boxShadow: '0 4px 20px rgba(80,60,40,0.10)', height: 200, flexShrink: 0, position: 'relative' }}>
-        {routeInfo && routeInfo.points.length > 1 ? (
+      {routeInfo && routeInfo.points.length > 1 ? (
           <Suspense fallback={<MapLoader/>}>
-            <ActiveJourneyMap route={routeInfo.points}/>
+            <ActiveJourneyMap route={routeInfo.points} currentPos={liveGPS ? [liveGPS.lat, liveGPS.lng] : null}/>
           </Suspense>
         ) : (
           <StaticFallbackMap variant={isConcern ? 'concern' : isOff ? 'offroute' : 'normal'} className="w-full h-full"/>
@@ -787,15 +936,45 @@ function ActiveJourney({ state, routeInfo, buddy, onNav }: {
           </GCard>
         </div>
       )}
-      {isNormal && (
+            {isNormal && (
         <div style={{ margin: '8px 14px 0' }}>
           <GCard className="px-4 py-3 flex justify-between">
-            {[['ETA','20:43'],['Remaining', routeInfo ? `${(routeInfo.distance * 0.4).toFixed(1)} km` : '2.1 km'],['Time','21 min']].map(([lb,vl]) => (
-              <div key={lb} style={{ textAlign: 'center' }}>
-                <p style={{ fontSize: 11, color: '#A09080' }}>{lb}</p>
-                <p style={{ fontSize: 15, fontWeight: 600, color: '#2A1F18', marginTop: 2 }}>{vl}</p>
-              </div>
-            ))}
+          {(() => {
+              const speed = ACTIVITY_SPEEDS[routeInfo?.activityType ?? 'run'] ?? 5
+              let remainingKm = routeInfo?.distance ?? 0
+
+              if (liveGPS && routeInfo && routeInfo.points.length > 1) {
+                const pts = routeInfo.points
+                // Find the closest point on the route to the user's current position
+                let closestIdx = 0
+                let closestDist = Infinity
+                pts.forEach((p, i) => {
+                  const d = haversine(liveGPS.lat, liveGPS.lng, p[0], p[1])
+                  if (d < closestDist) { closestDist = d; closestIdx = i }
+                })
+                // Sum the route distance from the closest point to the end
+                let distFromClosestToEnd = 0
+                for (let i = closestIdx; i < pts.length - 1; i++) {
+                  distFromClosestToEnd += haversine(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1])
+                }
+                remainingKm = distFromClosestToEnd
+              }
+
+              const remainingMin = Math.max(0, Math.round((remainingKm / speed) * 60))
+              const eta = new Date(Date.now() + remainingMin * 60000)
+              const etaStr = eta.toTimeString().slice(0, 5)
+
+              return [
+                ['ETA', liveGPS ? etaStr : '—'],
+                ['Remaining', liveGPS ? `${remainingKm.toFixed(1)} km` : '—'],
+                ['Time', liveGPS ? `${remainingMin} min` : '—'],
+              ].map(([lb, vl]) => (
+                <div key={lb} style={{ textAlign: 'center' }}>
+                  <p style={{ fontSize: 11, color: '#A09080' }}>{lb}</p>
+                  <p style={{ fontSize: 15, fontWeight: 600, color: '#2A1F18', marginTop: 2 }}>{vl}</p>
+                </div>
+              ))
+            })()}
           </GCard>
         </div>
       )}
@@ -1032,26 +1211,32 @@ function BuddyAlertTracking({ alertType, onBack }: {
 }
 
 // ─── Safety Circle ────────────────────────────────────────────────────────────
-function SafetyCircle({ contacts, onBack, onAddPerson, onEdit, onRemove }: {
+function SafetyCircle({ contacts, onBack, onAddPerson, onEdit, onRemove, onGetCode }: {
   contacts: Contact[]
   onBack: () => void
   onAddPerson: () => void
   onEdit: (index: number) => void
   onRemove: (index: number) => void
+  onGetCode: (index: number) => void
 }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Your Safety Circle" subtitle="People you trust to look out for you." onBack={onBack}/>
       <div style={{ flex: 1, padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: 10, overflowY: 'auto' }} className="no-scrollbar pb-4">
         {contacts.map((m, index) => (
-          <GCard key={m.name} className="p-4">
+          <GCard key={m.id} className="p-4">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Avatar name={m.name} active online/>
+              <Avatar name={m.name} active={!!m.pairedUserId} online={!!m.pairedUserId}/>
               <div style={{ flex: 1 }}>
                 <p style={{ fontWeight: 600, color: '#2A1F18', fontSize: 14 }}>{m.name}</p>
-                <p style={{ fontSize: 11, color: '#7A6860', marginTop: 2 }}>{m.role}</p>
+                <p style={{ fontSize: 11, color: m.pairedUserId ? '#3D7A50' : '#A09080', marginTop: 2 }}>
+                  {m.role}{m.pairedUserId ? ' · Connected' : ' · Not connected'}
+                </p>
               </div>
-              <div style={{ display: 'flex', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                {!m.pairedUserId && (
+                  <button onClick={() => onGetCode(index)} style={{ fontSize: 11, fontWeight: 600, color: '#1A4A7A', background: 'none', border: 'none', cursor: 'pointer' }}>Get code</button>
+                )}
                 <button onClick={() => onEdit(index)} style={{ fontSize: 11, fontWeight: 600, color: '#3D6B4F', background: 'none', border: 'none', cursor: 'pointer' }}>Edit</button>
                 <button onClick={() => onRemove(index)} style={{ fontSize: 11, color: '#A09080', background: 'none', border: 'none', cursor: 'pointer' }}>Remove</button>
               </div>
@@ -1072,7 +1257,148 @@ function SafetyCircle({ contacts, onBack, onAddPerson, onEdit, onRemove }: {
     </div>
   )
 }
+// ─── Invite Code Screen ───────────────────────────────────────────────────────
+function InviteCodeScreen({ code, contactName, onDone }: {
+  code: string; contactName: string; onDone: () => void
+}) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 24px', textAlign: 'center' }}>
+        <div className="glass-1" style={{ width: 90, height: 90, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 24 }}>
+          <div style={{ width: 32, height: 32, color: '#3D6B4F' }}>{I.share}</div>
+        </div>
 
+        <h1 className="font-display" style={{ fontSize: 28, color: '#2A1F18', marginBottom: 10 }}>Invite {contactName}</h1>
+        <p style={{ color: '#7A6860', fontSize: 14, marginBottom: 28, lineHeight: 1.55 }}>
+          Share this code with {contactName}. They'll enter it in their SafeJourney app to become your safety buddy.
+        </p>
+
+        <GCard className="w-full p-6 mb-5">
+          <p style={{ fontSize: 11, fontWeight: 700, color: '#A09080', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 12 }}>Invite code</p>
+          <p className="font-display" style={{ fontSize: 44, color: '#2A1F18', letterSpacing: '0.1em' }}>{code}</p>
+        </GCard>
+
+        <GCard tint="blue" className="w-full p-4">
+          <p style={{ fontSize: 12, color: '#1A3A6A', lineHeight: 1.55 }}>This code expires in 7 days. You can find it again anytime from your Safety Circle.</p>
+        </GCard>
+      </div>
+
+      <div style={{ padding: '8px 16px 36px', width: '100%' }}>
+        <button className="btn-blue" onClick={onDone}>Done</button>
+      </div>
+    </div>
+  )
+}
+// ─── Enter Invite Code Screen ─────────────────────────────────────────────────
+function EnterInviteCodeScreen({ onBack, onRedeemed }: {
+  onBack: () => void
+  onRedeemed: (ownerName: string) => void
+}) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '16px', borderRadius: 16, fontSize: 22, fontFamily: 'Outfit,sans-serif', fontWeight: 600, color: '#2A1F18', textAlign: 'center', letterSpacing: '0.15em',
+    background: 'rgba(255,255,255,0.42)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)',
+    border: '1px solid rgba(255,255,255,0.62)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.72)', outline: 'none',
+    textTransform: 'uppercase',
+  }
+
+  const handleRedeem = async () => {
+    setError('')
+    setLoading(true)
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+
+    const cleanCode = code.trim().toUpperCase()
+
+    const { data: invite, error: findError } = await supabase
+      .from('invites')
+      .select('id, contact_id, owner_id, redeemed_by, expires_at')
+      .eq('code', cleanCode)
+      .maybeSingle()
+
+    if (findError || !invite) {
+      setError('Invalid invite code.')
+      setLoading(false)
+      return
+    }
+    if (invite.redeemed_by) {
+      setError('This code has already been used.')
+      setLoading(false)
+      return
+    }
+    if (new Date(invite.expires_at) < new Date()) {
+      setError('This code has expired.')
+      setLoading(false)
+      return
+    }
+    if (invite.owner_id === user.id) {
+      setError("You can't use your own invite code.")
+      setLoading(false)
+      return
+    }
+
+    const { error: updateInviteError } = await supabase
+      .from('invites')
+      .update({ redeemed_by: user.id, redeemed_at: new Date().toISOString() })
+      .eq('id', invite.id)
+
+    if (updateInviteError) {
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
+      return
+    }
+
+    const { error: updateContactError } = await supabase
+      .from('contacts')
+      .update({ paired_user_id: user.id })
+      .eq('id', invite.contact_id)
+
+    if (updateContactError) {
+      setError('Something went wrong. Please try again.')
+      setLoading(false)
+      return
+    }
+
+    const { data: ownerData } = await supabase
+      .from('contacts')
+      .select('name')
+      .eq('id', invite.contact_id)
+      .maybeSingle()
+
+    setLoading(false)
+    onRedeemed(ownerData?.name ?? 'them')
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <Header title="Enter invite code" subtitle="Ask your friend for their invite code to become their safety buddy." onBack={onBack}/>
+      <div style={{ flex: 1, padding: '16px 16px 0', display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <input
+          style={inputStyle}
+          type="text"
+          placeholder="CODE"
+          value={code}
+          maxLength={6}
+          onChange={e => setCode(e.target.value)}
+        />
+        {error && (
+          <GCard tint="red" className="p-3">
+            <p style={{ fontSize: 12, color: '#8A2020' }}>{error}</p>
+          </GCard>
+        )}
+      </div>
+      <div style={{ padding: '12px 16px 24px' }}>
+        <button className="btn-blue" disabled={!code.trim() || loading} onClick={handleRedeem}>
+          {loading ? 'Checking…' : 'Connect'}
+        </button>
+      </div>
+    </div>
+  )
+}
 // ─── Journey History / Your Journeys ─────────────────────────────────────────
 function History({ onBack, completedJourneys }: { onBack: () => void; completedJourneys: CompletedJourney[] }) {
   const [filter, setFilter] = useState<'all' | 'normal' | 'unusual'>('all')
@@ -1304,10 +1630,12 @@ function TrackingScreen({ journeyActive, routeInfo, userName, buddyJState, setBu
 }
 
 // ─── Profile ──────────────────────────────────────────────────────────────────
-function Profile({ onBack, onSettings, userName, userEmail, onDataPrivacy, onDeleteAccount }: {
+function Profile({ onBack, onSettings, userName, userEmail, onDataPrivacy, onDeleteAccount, onLogout, onEnterCode }: {
   onBack: () => void; onSettings: () => void
   userName: string; userEmail: string
   onDataPrivacy: () => void; onDeleteAccount: () => void
+  onLogout: () => void
+  onEnterCode: () => void
 }) {
   const [locShare, setLocShare] = useState(true)
   const [autoEnd, setAutoEnd] = useState(true)
@@ -1362,6 +1690,12 @@ function Profile({ onBack, onSettings, userName, userEmail, onDataPrivacy, onDel
 
         <button className="btn-ghost" onClick={onSettings} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <div style={{ width: 16, height: 16 }}>{I.settings}</div> Settings
+        </button>
+        <button className="btn-ghost" onClick={onEnterCode} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <div style={{ width: 16, height: 16 }}>{I.plus}</div> Enter invite code
+        </button>
+        <button onClick={onLogout} style={{ padding: '10px', fontSize: 13, color: '#A09080', fontFamily: 'Outfit,sans-serif', cursor: 'pointer', background: 'none', border: 'none', textAlign: 'center' }}>
+          Log out
         </button>
       </div>
     </div>
@@ -1450,8 +1784,8 @@ function PaymentMethodScreen({ onComplete, onBack }: { onComplete: () => void; o
 <div style={{ flex: 1, minHeight: 0, padding: '4px 16px 24px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }} className="no-scrollbar">
 
   <GCard tint="amber" className="p-4">
-    <p style={{ fontSize: 12, fontWeight: 600, color: '#6A3800', marginBottom: 2 }}>Demo mode</p>
-    <p style={{ fontSize: 12, color: '#8A4020', lineHeight: 1.5 }}>
+    <p style={{ fontSize: 11, fontWeight: 600, color: '#6A3800', marginBottom: 2 }}>Demo mode</p>
+    <p style={{ fontSize: 11, color: '#8A4020', lineHeight: 1.5 }}>
       This is a portfolio demo — no real payment is processed.
     </p>
   </GCard>
@@ -1901,40 +2235,73 @@ export default function App() {
   // User account
   const [hasAccount, setHasAccount] = useState(false)
   const [accountDraft, setAccountDraft] = useState({ name: '', email: '', phone: '' })
+  const [signupError, setSignupError] = useState('')
+  const [pendingInviteCode, setPendingInviteCode] = useState('')
+  const [pendingContactName, setPendingContactName] = useState('')
   
   const [userName, setUserName] = useState('Petra')
   const [userEmail, setUserEmail] = useState('')
   const [userPhone, setUserPhone] = useState('')
 
   // Contacts
-  const [contacts, setContacts] = useState<Contact[]>([
-    { name: 'Ana', phone: '', role: 'Best friend' },
-    { name: 'Sara', phone: '', role: 'Sister' },
-    { name: 'Marko', phone: '', role: 'Partner' },
-  ])
+  const [contacts, setContacts] = useState<Contact[]>([])
+
+  const loadContacts = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('id, name, phone, role, paired_user_id')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('Contacts load error:', error)
+      return
+    }
+    setContacts((data ?? []).map(c => ({
+      id: c.id, name: c.name, phone: c.phone, role: c.role, pairedUserId: c.paired_user_id,
+    })))
+  }
   const [isSubscribed, setIsSubscribed] = useState(false)
+  const [checkingSession, setCheckingSession] = useState(true)
+
   useEffect(() => {
-    const loadSubscription = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-  
-      if (!user) return
-  
+    const restoreSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      const user = session?.user
+
+      if (!user) {
+        setCheckingSession(false)
+        return
+      }
+
+      const name = (user.user_metadata?.full_name as string) || 'Petra'
+      const phone = (user.user_metadata?.phone as string) || ''
+      setUserName(name)
+      setUserEmail(user.email ?? '')
+      setUserPhone(phone)
+      setHasAccount(true)
+      setOnboarding(false)
+      setScreen('home')
+      loadContacts(user.id)
+      loadJourneys(user.id)
+
       const { data, error } = await supabase
         .from('subscriptions')
         .select('status')
         .eq('user_id', user.id)
         .eq('status', 'active')
         .maybeSingle()
-  
+
       if (error) {
         console.error('Subscription load error:', error)
-        return
+      } else {
+        setIsSubscribed(!!data)
       }
-  
-      setIsSubscribed(!!data)
+
+      setCheckingSession(false)
     }
-  
-    loadSubscription()
+
+    restoreSession()
   }, [])
   const [addContactReturn, setAddContactReturn] = useState<Screen>('safety-buddy')
   const [editContactIndex, setEditContactIndex] = useState<number | null>(null)
@@ -1943,10 +2310,33 @@ export default function App() {
   const [journeyActive, setJourneyActive] = useState(false)
   const [buddyJState, setBuddyJState] = useState<'normal' | 'stopped' | 'offroute' | 'fall'>('normal')
 
-  // Completed journeys
-  const [completedJourneys, setCompletedJourneys] = useState<CompletedJourney[]>([
-    { id: 0, name: 'Morning Run', activityType: 'run', distanceKm: 6.1, durationMin: 42, completedAt: new Date('2024-08-10'), status: 'offroute' }
-  ])
+    // Completed journeys
+    const [completedJourneys, setCompletedJourneys] = useState<CompletedJourney[]>([])
+
+    const loadJourneys = async (userId: string) => {
+      const { data, error } = await supabase
+        .from('journeys')
+        .select('id, name, activity_type, planned_distance_km, estimated_duration_min, safety_status, completed_at')
+        .eq('owner_id', userId)
+        .not('completed_at', 'is', null)
+        .order('completed_at', { ascending: false })
+  
+      if (error) {
+        console.error('Journeys load error:', error)
+        return
+      }
+  
+      const mapped: CompletedJourney[] = (data ?? []).map(j => ({
+        id: j.id,
+        name: j.name,
+        activityType: j.activity_type,
+        distanceKm: j.planned_distance_km ?? 0,
+        durationMin: j.estimated_duration_min ?? 0,
+        completedAt: new Date(j.completed_at),
+        status: j.safety_status as CompletedJourney['status'],
+      }))
+      setCompletedJourneys(mapped)
+    }
   const [journeyEndStatus, setJourneyEndStatus] = useState<'normal' | 'stopped' | 'offroute' | 'fall'>('normal')
 
   // Modals
@@ -1987,39 +2377,105 @@ export default function App() {
     else go(s)
   }
 
-  const addJourney = () => {
+  const addJourney = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    const name = routeInfo?.name ?? 'Run'
+    const activityType = routeInfo?.activityType ?? 'run'
+    const distanceKm = routeInfo?.distance ?? 5.2
+    const durationMin = routeInfo?.estimatedMinutes ?? 34
+
+    const { data, error } = await supabase
+    .from('journeys')
+    .insert({
+      owner_id: user.id,
+      name,
+      activity_type: activityType,
+      planned_distance_km: distanceKm,
+      estimated_duration_min: durationMin,
+      status: 'completed',
+      safety_status: journeyEndStatus,
+      completed_at: new Date().toISOString(),
+    })
+    .select('id, completed_at')
+    .single()
+
+    if (error) {
+      console.error('Journey insert error:', error)
+      return
+    }
+
     const newJourney: CompletedJourney = {
-      id: Date.now(),
-      name: routeInfo?.name ?? 'Run',
-      activityType: routeInfo?.activityType ?? 'run',
-      distanceKm: routeInfo?.distance ?? 5.2,
-      durationMin: routeInfo?.estimatedMinutes ?? 34,
-      completedAt: new Date(),
+      id: data.id,
+      name,
+      activityType,
+      distanceKm,
+      durationMin,
+      completedAt: new Date(data.completed_at),
       status: journeyEndStatus,
     }
     setCompletedJourneys(prev => [newJourney, ...prev])
   }
 
-  const handleAddContact = (c: Contact) => {
+  const handleAddContact = async (c: Omit<Contact, 'id'>) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
     if (editContactIndex !== null) {
-      setContacts(prev => prev.map((existing, i) => i === editContactIndex ? c : existing))
+      const existing = contacts[editContactIndex]
+      const { error } = await supabase
+        .from('contacts')
+        .update({ name: c.name, phone: c.phone, role: c.role })
+        .eq('id', existing.id)
+
+      if (error) {
+        console.error('Contact update error:', error)
+        return
+      }
+      setContacts(prev => prev.map((item, i) => i === editContactIndex ? { ...item, ...c } : item))
       setEditContactIndex(null)
     } else {
-      setContacts(prev => [...prev, c])
+      const { data, error } = await supabase
+      .from('contacts')
+      .insert({ user_id: user.id, name: c.name, phone: c.phone, role: c.role })
+      .select('id, name, phone, role, paired_user_id')
+      .single()
+
+    if (error) {
+      console.error('Contact insert error:', error)
+      return
+    }
+    setContacts(prev => [...prev, {
+      id: data.id, name: data.name, phone: data.phone, role: data.role, pairedUserId: data.paired_user_id,
+    }])
     }
     go(addContactReturn)
   }
+  const generateInviteCode = async (contactId: string): Promise<string | null> => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
 
+    const code = Math.random().toString(36).slice(2, 8).toUpperCase()
+
+    const { error } = await supabase
+      .from('invites')
+      .insert({ code, contact_id: contactId, owner_id: user.id })
+
+    if (error) {
+      console.error('Invite create error:', error)
+      return null
+    }
+    return code
+  }
   const showNav = !['create-journey','safety-buddy','journey-review','active-journey','arrival',
     'buddy-webview','buddy-alert','buddy-alert-tracking','add-contact','account-setup',
     'data-privacy','help-support','about',
     'subscription-plan','payment-method','subscription-settings'].includes(screen) && !onboarding
 
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', padding: '32px 16px', background: 'linear-gradient(160deg, #1A1410 0%, #0E0E12 100%)' }}>
-
-      {/* Phone frame */}
-      <div className="app-bg" style={{ position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden', width: 390, height: 844, borderRadius: 52, boxShadow: '0 0 0 12px #1C1917, 0 60px 120px rgba(0,0,0,0.70)' }}>
+    return (
+      <>
+              <div className="app-bg" style={{ position: 'relative', display: 'flex', flexDirection: 'column', overflow: 'hidden', width: '100vw', height: '100dvh' }}>
 
         {/* Background orbs */}
         <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden', zIndex: 0 }}>
@@ -2029,17 +2485,15 @@ export default function App() {
           <div style={{ position: 'absolute', bottom: 200, right: 0, width: 140, height: 140, borderRadius: '50%', background: 'radial-gradient(circle, rgba(249,221,209,0.28) 0%, transparent 70%)' }}/>
         </div>
 
-        {/* Status bar */}
-        <div style={{ position: 'relative', zIndex: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 28px 6px', height: 44 }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: '#2A1F18' }}>9:41</span>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 500, color: '#4A3830' }}>
-            <span>●●●</span><span>WiFi</span><span>■</span>
-          </div>
-        </div>
+        <div style={{ position: 'relative', zIndex: 10, flexShrink: 0, height: 'env(safe-area-inset-top, 20px)' }}/>
 
-        {/* Screen content */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
-          {onboarding ? (
+               {/* Screen content */}
+               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', position: 'relative', zIndex: 1 }}>
+          {checkingSession ? (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div className="w-6 h-6 border-2 border-[#4A7C59] border-t-transparent rounded-full animate-spin"/>
+            </div>
+          ) : onboarding ? (
             <Onboarding
               hasAccount={hasAccount}
               onComplete={() => { setOnboarding(false); setScreen('account-setup') }}
@@ -2048,9 +2502,11 @@ export default function App() {
           ) : (
             <>
               <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-                {screen === 'account-setup' && (
+              {screen === 'account-setup' && (
                   <AccountSetup
+                    error={signupError}
                     onConfirm={async (name, email, phone, password) => {
+                      setSignupError('')
                       const { data, error } = await supabase.auth.signUp({
                         email,
                         password,
@@ -2063,7 +2519,13 @@ export default function App() {
                       })
 
                       if (error) {
-                        console.error('Supabase signup error:', error)
+                        if (error.message.includes('already registered') || error.message.includes('already exists')) {
+                          setSignupError('An account with this email already exists. Try logging in instead.')
+                        } else if (error.message.includes('Password')) {
+                          setSignupError('Password must be at least 6 characters.')
+                        } else {
+                          setSignupError(error.message)
+                        }
                         return
                       }
                       
@@ -2074,7 +2536,11 @@ export default function App() {
                         })
                       
                         if (signInError) {
-                          console.error('Supabase sign-in error:', signInError)
+                          if (signInError.message.includes('Email not confirmed')) {
+                            setSignupError('Account created — please confirm your email before logging in.')
+                          } else {
+                            setSignupError(signInError.message)
+                          }
                           return
                         }
                       }
@@ -2091,6 +2557,24 @@ export default function App() {
                     onDataPrivacy={() => { setDataPrivacyFrom('account-setup'); go('data-privacy') }}
                     initialValues={accountDraft}
                     onValuesChange={setAccountDraft}
+                    onGoToLogin={() => { setOnboarding(false); go('login') }}
+                  />
+                )}
+                               {screen === 'login' && (
+                  <Login
+                    onLoginSuccess={async (name, email, phone) => {
+                      setUserName(name || 'Petra')
+                      setUserEmail(email)
+                      setUserPhone(phone)
+                      setHasAccount(true)
+                      const { data: { user } } = await supabase.auth.getUser()
+                      if (user) {
+                        loadContacts(user.id)
+                        loadJourneys(user.id)
+                      }
+                      go('home')
+                    }}
+                    onGoToSignup={() => go('account-setup')}
                   />
                 )}
                 {screen === 'home' && (
@@ -2143,11 +2627,11 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                {screen === 'arrival' && (
+                                {screen === 'arrival' && (
                   <Arrival
                     routeInfo={routeInfo} buddy={buddy}
-                    onDone={() => { addJourney(); go('home'); setRouteInfo(null); setJourneyActive(false) }}
-                    onViewJourneys={() => { addJourney(); go('history'); setJourneyActive(false) }}
+                    onDone={async () => { await addJourney(); go('home'); setRouteInfo(null); setJourneyActive(false) }}
+                    onViewJourneys={async () => { await addJourney(); go('history'); setJourneyActive(false) }}
                   />
                 )}
                 {screen === 'buddy-webview' && (
@@ -2168,24 +2652,65 @@ export default function App() {
                     setBuddyJState={setBuddyJState}
                   />
                 )}
-                {screen === 'safety-circle' && (
+                                {screen === 'safety-circle' && (
                   <SafetyCircle
                     contacts={contacts}
                     onBack={() => go('home')}
                     onAddPerson={() => { setAddContactReturn('safety-circle'); setEditContactIndex(null); go('add-contact') }}
                     onEdit={(index) => { setEditContactIndex(index); setAddContactReturn('safety-circle'); go('add-contact') }}
-                    onRemove={(index) => { setContacts(prev => prev.filter((_, i) => i !== index)) }}
+                    onRemove={async (index) => {
+                      const toRemove = contacts[index]
+                      const { error } = await supabase.from('contacts').delete().eq('id', toRemove.id)
+                      if (error) {
+                        console.error('Contact delete error:', error)
+                        return
+                      }
+                      setContacts(prev => prev.filter((_, i) => i !== index))
+                    }}
+                    onGetCode={async (index) => {
+                      const contact = contacts[index]
+                      const code = await generateInviteCode(contact.id)
+                      if (code) {
+                        setPendingInviteCode(code)
+                        setPendingContactName(contact.name)
+                        go('invite-code')
+                      }
+                    }}
+                  />
+                )}
+                {screen === 'invite-code' && (
+                  <InviteCodeScreen
+                    code={pendingInviteCode}
+                    contactName={pendingContactName}
+                    onDone={() => go('safety-circle')}
+                  />
+                )}
+                {screen === 'enter-invite-code' && (
+                  <EnterInviteCodeScreen
+                    onBack={() => go('profile')}
+                    onRedeemed={() => go('home')}
                   />
                 )}
                 {(screen === 'history' || screen === 'your-journeys') && (
                   <History onBack={() => go('home')} completedJourneys={completedJourneys}/>
                 )}
-                {screen === 'profile' && (
+                                                {screen === 'profile' && (
                   <Profile
                     onBack={() => go('home')} onSettings={() => go('settings')}
                     userName={userName} userEmail={userEmail}
                     onDataPrivacy={() => { setDataPrivacyFrom('profile'); go('data-privacy') }}
                     onDeleteAccount={() => setShowDeleteConfirm(true)}
+                    onEnterCode={() => go('enter-invite-code')}
+                    onLogout={async () => {
+                      await supabase.auth.signOut()
+                      setHasAccount(false)
+                      setUserName('Petra')
+                      setUserEmail('')
+                      setUserPhone('')
+                      setIsSubscribed(false)
+                      setOnboarding(true)
+                      setScreen('home')
+                    }}
                   />
                 )}
                 {screen === 'settings' && (
@@ -2241,26 +2766,33 @@ const user = session.user
                   />
                 )}
                 {screen === 'subscription-settings' && (
-                  <SubscriptionSettingsScreen
-                    onBack={() => go('settings')}
-                    isSubscribed={isSubscribed}
-                    onCancelConfirm={() => {
-                      setIsSubscribed(false)
-                      setHasAccount(false)
-                      setOnboarding(true)
-                      setScreen('home')
-                      setAccountDraft({ name: '', email: '', phone: '' })
-                    }}
-                  />
-                )}
+  <SubscriptionSettingsScreen
+    onBack={() => go('settings')}
+    isSubscribed={isSubscribed}
+    onCancelConfirm={async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        await supabase.from('subscriptions').update({ status: 'cancelled' }).eq('user_id', user.id)
+      }
+      await supabase.auth.signOut()
+      setIsSubscribed(false)
+      setHasAccount(false)
+      setUserName('Petra')
+      setUserEmail('')
+      setUserPhone('')
+      setOnboarding(true)
+      setScreen('home')
+      setAccountDraft({ name: '', email: '', phone: '' })
+    }}
+  />
+)}
               </div>
               {showNav && <BottomNav active={tab} onNav={goTab}/>}
             </>
           )}
         </div>
 
-        {/* Home indicator */}
-        <div style={{ position: 'absolute', bottom: 8, left: '50%', transform: 'translateX(-50%)', width: 112, height: 4, borderRadius: 999, background: 'rgba(42,31,24,0.16)', zIndex: 20, pointerEvents: 'none' }}/>
+      
 
         {/* Modals */}
         {showDeleteConfirm && (
@@ -2313,6 +2845,6 @@ const user = session.user
           <ScreenPicker cur={screen} onPick={pickScreen}/>
         </div>
       </div>
-    </div>
+    </>
   )
 }
